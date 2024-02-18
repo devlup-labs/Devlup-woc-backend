@@ -1,7 +1,7 @@
 from fastapi import APIRouter
-from app.config.database import collection_projects
-from app.schema.ProjectSchema import list_schema
-from app.models.Project import Project
+from config.database import collection_projects
+from schema.ProjectSchema import list_schema
+from models.Project import Project
 
 route = APIRouter()
 

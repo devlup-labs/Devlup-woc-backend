@@ -1,8 +1,10 @@
 def dict_schema(projects)->dict:
     return {
-        "id": str(projects["_id"]),
-        "title:": str(projects["title"]),
+        "id": str(projects["id"]),
+        "title": str(projects["title"]),
+        "tag": str(projects["tag"]),
         "description": str(projects["description"]),
+        "technology": str(projects["technology"]),
         "mentor": str(projects["mentor"])
     }
 
