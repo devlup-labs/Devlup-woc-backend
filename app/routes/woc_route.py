@@ -9,7 +9,7 @@ from schema.UserSchema import user_dict
 from schema.MentorSchema import mentor_dist,mentor_list
 from schema.ProjectSchema import dict_schema,list_schema
 from schema.ProgramSchema import program_dist,program_list
-from starlette.requests import Request  
+from starlette.requests import Request
 from google.auth.transport import requests
 from fastapi.responses import JSONResponse
 from bson import ObjectId
@@ -22,7 +22,7 @@ GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI")
 import requests
 route = APIRouter()
 
-#projects 
+#projects
 @route.post('/project')
 async def get_projects(request:Request):
     data = await request.json()
@@ -54,14 +54,14 @@ async def post_timeline(request:Request):
     return{'status':'success'}
 
 
-    
+
 #google authentication
 @route.post("/auth/google")
 async def auth_google(request:Request):
     data = await request.json()
     code = data['code']
     token_url = "https://accounts.google.com/o/oauth2/token"
-    
+
     data = {
         "code": code,
         "client_id": {GOOGLE_CLIENT_ID},
@@ -78,7 +78,7 @@ async def auth_google(request:Request):
         user_info = requests.get("https://www.googleapis.com/oauth2/v1/userinfo", headers={"Authorization": f"Bearer {access_token}"})
         return {"success":True, "user":user_info.json(),"token":access_token,"refresh":refresh_token}
     else:      return {"success":False}
-   
+
 #token verification
 @route.post("/token")
 async def get_user(request:Request):
@@ -116,7 +116,7 @@ async def create_user(request:Request):
 async def get_user(request:Request):
     data = await request.json()
     id= data['id']
-    
+
     user =collection_users.find_one({'id':id})
     if(user):
      user_format = user_dict(user)
@@ -134,8 +134,8 @@ async def update_user(request:Request):
    else :
       update_user = user_dict(data)
       collection_users.update_one(
-        {"_id": user["_id"]}, 
-        {"$set": update_user}  
+        {"_id": user["_id"]},
+        {"$set": update_user}
     )
    return {"success":'true',"update_user":update_user}
 
@@ -154,10 +154,10 @@ async def acceptmentor(request:Request):
     user['role']='2'
     print(user)
     collection_users.update_one(
-        {"_id": user["_id"]}, 
+        {"_id": user["_id"]},
         {"$set": user}  )
     return{"success":"true"}
-   
+
 @route.get("/getrequests")
 async def getmentor_requests():
     mentors = mentor_list(collection_mentors.find())

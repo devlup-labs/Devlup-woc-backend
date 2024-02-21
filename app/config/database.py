@@ -1,20 +1,46 @@
 from pymongo import MongoClient
 import os
 from dotenv import load_dotenv
+
+# Load environment variables from .env file
 load_dotenv()
-MONGO_URL= os.environ.get("MONGO_URL")
-client = MongoClient({MONGO_URL})
+
+# Get the MongoDB connection URIs from environment variables
+MONGO_URL_DEVLUP = os.environ.get("MONGO_URL_DEVLUP")
+MONGO_URL_WOC = os.environ.get("MONGO_URL_WOC")
+
+# Connect to the MongoDB servers for Devlup and Woc
+client_devlup = MongoClient(MONGO_URL_DEVLUP)
+client_woc = MongoClient(MONGO_URL_WOC)
 
 try:
-    client.admin.command('ping')
-    print('database connected')
-    db = client["DevlupWoc"]
-    collection_projects = db["projects"]
-    collection_timeline = db["timeline"]
-    collection_users = db["users"]
-    collection_mentors = db["mentors"]
-    collection_ideas = db["ideas"]   
-    collection_programs = db["programs"]  
+    # Check if the Devlup database connection is successful
+    client_devlup.admin.command('ping')
+    print('Devlup database connected')
 
-except:
-    print('database not connected')
+    # Access the databases
+    db_team1 = client_devlup["Team"]
+    db_timeline1 = client_devlup["Timeline"]
+
+    # Define collections for the databases, More to add as we go
+    collection_current1 = db_team1["Current"]
+    collection_alumni1 = db_team1["Alumni"]
+    collection_timeline1 = db_timeline1["timeline"]
+
+    # Check if the Woc database connection is successful
+    client_woc.admin.command('ping')
+    print('Woc database connected')
+
+    # Access the Woc database
+    db_woc = client_woc["Woc"]
+
+    # Define collections for the Woc database (commented-out)
+    collection_projects = db_woc["projects"]
+    collection_timeline = db_woc["timeline"]
+    collection_users = db_woc["users"]
+    collection_mentors = db_woc["mentors"]
+    collection_ideas = db_woc["ideas"]
+    collection_programs = db_woc["programs"]
+
+except Exception as e:
+    print('Database connection error:', e)
