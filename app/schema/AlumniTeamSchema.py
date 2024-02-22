@@ -1,4 +1,4 @@
-def alumniteam(a_team) -> dict:
+def alumniteam_dict(a_team) -> dict:
     return {
         "name": str(a_team["name"]),
         "role": str(a_team["role"]),
@@ -9,4 +9,4 @@ def alumniteam(a_team) -> dict:
     }
 
 def list_schema2(a_team) -> list:
-    return [alumniteam(project) for project in a_team]
+    return [alumniteam_dict(project) for project in a_team]

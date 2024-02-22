@@ -1,5 +1,5 @@
 
-def currteam(c_team) -> dict:
+def currteam_dict(c_team) -> dict:
     return {
         "name": str(c_team["name"]),
         "role": str(c_team["role"]),
@@ -11,4 +11,4 @@ def currteam(c_team) -> dict:
 
 
 def list_schema1(c_team) -> list:
-    return [currteam(i) for i in c_team]
+    return [currteam_dict(i) for i in c_team]

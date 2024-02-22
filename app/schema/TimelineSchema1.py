@@ -1,4 +1,4 @@
-def timeline(tl_item) -> dict:
+def timeline1_dict(tl_item) -> dict:
     return {
         "Index": int(tl_item["Index"]),
         "colorClass": str(tl_item["colorClass"]),
@@ -12,4 +12,4 @@ def timeline(tl_item) -> dict:
     }
 
 def list_schema3(tl_items) -> list:
-    return [timeline(item) for item in tl_items]
+    return [timeline1_dict(item) for item in tl_items]
