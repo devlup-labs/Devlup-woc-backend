@@ -1,11 +1,13 @@
-def dict_schema(projects)->dict:
+def projectpage_dict(project) -> dict:
     return {
-        "id": str(projects["_id"]),
-        "title:": str(projects["title"]),
-        "description": str(projects["description"]),
-        "mentor": str(projects["mentor"])
+        "id": str(project["_id"]),
+        "avatarSrc": str(project["avatarSrc"]),
+        "name": str(project["name"]),
+        "bio": str(project["bio"]),
+        "socialIcons": project.get("socialIcons", []),
+        "buttons": project.get("buttons", []),
+        "isPro": project.get("isPro", False)
     }
 
-def list_schema(projects)->list:
-    return [dict_schema(project) for project in projects]
-
+def list_projectpage_schema(projects) -> list:
+    return [projectpage_dict(project) for project in projects]

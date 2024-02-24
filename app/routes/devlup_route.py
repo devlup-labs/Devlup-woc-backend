@@ -2,13 +2,28 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from config.database import (
     collection_timeline1,
-    collection_team1
+    collection_team1,
+    collection_blog1,
+    collection_project1
 )
 from schema.TimelineSchema1 import list_schema3, timeline1_dict
 from schema.AlumniTeamSchema import list_schema2, alumniteam_dict
 from schema.CurrentTeamSchema import list_schema1, currteam_dict
-
+from schema.BlogPageSchema import list_blogs_schema
+from schema.ProjectSchema1 import list_projectpage_schema
 route = APIRouter()
+
+# ProjectPage fetching
+@route.get('/projectpage')
+async def get_projectspage():
+    projp=list_projectpage_schema(collection_project1.find({}))
+    return JSONResponse(content=projp)
+# Blog Page fetching
+@route.get('/blogpage')
+async def get_blogpage():
+    blogp=list_blogs_schema(collection_blog1.find({}))
+    return JSONResponse(content=blogp)
+
 
 @route.get('/current-team')
 async def get_current_team():
