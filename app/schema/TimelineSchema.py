@@ -1,5 +1,4 @@
 def timeline_dict(timeline)->dict:
-    print(timeline)
     return {
         "id": str(timeline["_id"]),
         "date": str(timeline["date"]),

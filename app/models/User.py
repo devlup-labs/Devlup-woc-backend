@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-
+from Project import Project
 class User(BaseModel):
     id:str
     first_name: str
@@ -10,3 +10,4 @@ class User(BaseModel):
     githublink:str
     role:str
     phonenumber:int
+    projects : list[Project]=[]
