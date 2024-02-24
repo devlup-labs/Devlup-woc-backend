@@ -15,6 +15,7 @@ try:
     collection_mentors = db["mentors"]
     collection_ideas = db["ideas"]   
     collection_programs = db["programs"]  
+    collection_proposals = db["proposals"]  
 
 except:
     print('database not connected')
