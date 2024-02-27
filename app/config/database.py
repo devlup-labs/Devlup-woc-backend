@@ -24,6 +24,7 @@ try:
     collection_blog1 = db["BlogPage"]
     collection_project1 = db["Projects1"]
     collection_videos1=db["videosPage"]
+    collection_contact1=db["contactUS"]
 
 except:
     print('database not connected')

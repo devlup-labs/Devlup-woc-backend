@@ -5,7 +5,8 @@ from config.database import (
     collection_team1,
     collection_blog1,
     collection_project1,
-    collection_videos1
+    collection_videos1,
+    collection_contact1
 )
 from schema.TimelineSchema1 import list_schema3, timeline1_dict
 from schema.AlumniTeamSchema import list_schema2, alumniteam_dict
@@ -13,13 +14,26 @@ from schema.CurrentTeamSchema import list_schema1, currteam_dict
 from schema.BlogPageSchema import list_blogs_schema
 from schema.ProjectSchema1 import list_projectpage_schema
 from schema.VideosSchema import videos_list
+from schema.ContactUSSchema import list_contact
 from models.CurrentTeam import CurrentTeam
 from models.AlumniTeam import AlumniTeam
 from models.Timelinedev import Timeline1
 from models.Projects import Projects
 from models.Blogpage import Blog
 from models.Videos import Videos
+from models.ContactUS import ContactUS
 route = APIRouter()
+# email posting
+@route.post('/contactus')
+async def post_cont(con: ContactUS):
+    conn = con.dict()
+    collection_contact1.insert_one(conn)
+    return {'status': 'success'}
+# email fetching
+@route.get('/contactus')
+async def get_mails():
+    emails=list_contact(collection_contact1.find({}))
+    return JSONResponse(content=emails)
 
 # Videos fetching
 @route.get('/videos')
