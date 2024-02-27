@@ -8,7 +8,7 @@ client = MongoClient({MONGO_URL})
 try:
     client.admin.command('ping')
     print('database connected')
-    db = client["DevlupWoc"]
+    db = client["Devlup-woc-backend"]
     collection_projects = db["projects"]
     collection_timeline = db["timeline"]
     collection_users = db["users"]
@@ -16,6 +16,14 @@ try:
     collection_ideas = db["ideas"]   
     collection_programs = db["programs"]  
     collection_proposals = db["proposals"]  
+
+ # Accessing  the collections
+
+    collection_timeline1 = db["TimelinePage"]
+    collection_team1 = db["TeamAll"]
+    collection_blog1 = db["BlogPage"]
+    collection_project1 = db["Projects1"]
+    collection_videos1=db["videosPage"]
 
 except:
     print('database not connected')
