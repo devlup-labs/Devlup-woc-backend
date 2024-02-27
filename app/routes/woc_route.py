@@ -1,5 +1,5 @@
 from fastapi import APIRouter,Query
-from fastapi import  Request
+from fastapi import Request
 from config.database import collection_projects
 from config.database import collection_timeline,collection_mentors,collection_ideas,collection_programs
 from config.database import collection_users
@@ -14,7 +14,7 @@ from google.auth.transport import requests
 from fastapi.responses import JSONResponse
 from bson import ObjectId
 from dotenv import load_dotenv
-load_dotenv()  # take environment variables from .env.
+load_dotenv()  # take environment variables from .env.example.
 import os
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET =os.environ.get("GOOGLE_CLIENT_SECRET")

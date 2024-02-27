@@ -6,7 +6,8 @@ def currteam_dict(c_team) -> dict:
         "avatar": str(c_team["avatar"]),
         "linkedin": str(c_team["linkedin"]),
         "mail": str(c_team["mail"]),
-        "github": str(c_team["github"])
+        "github": str(c_team["github"]),
+        "AlumniStatus" :int(c_team["AlumniStatus"])
     }
 
 

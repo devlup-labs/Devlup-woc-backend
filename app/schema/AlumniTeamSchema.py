@@ -5,7 +5,8 @@ def alumniteam_dict(a_team) -> dict:
         "avatar": str(a_team["avatar"]),
         "linkedin": str(a_team["linkedin"]),
         "mail": str(a_team["mail"]),
-        "github": str(a_team["github"])
+        "github": str(a_team["github"]),
+        "AlumniStatus" : int(a_team["AlumniStatus"])
     }
 
 def list_schema2(a_team) -> list:

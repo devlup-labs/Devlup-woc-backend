@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Get the MongoDB connection URIs from environment variables
-MONGO_URL = os.environ.get("MONGO_URL_DEVLUP")
+MONGO_URL = os.environ.get("MONGO_URL")
 
 # Connecting to the MongoDB server
 client = MongoClient(MONGO_URL)
@@ -25,6 +25,7 @@ try:
     collection_team1 = db["TeamAll"]
     collection_blog1 = db["BlogPage"]
     collection_project1 = db["Projects1"]
+    collection_videos1=db["videosPage"]
     # for Woc
     collection_projects = db["projects"]
     collection_timeline = db["timeline"]

@@ -7,3 +7,4 @@ class AlumniTeam(BaseModel):
     linkedin: str
     mail: str
     github: str
+    AlumniStatus : int

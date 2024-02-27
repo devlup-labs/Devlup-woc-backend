@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 
-class Timeline_dev(BaseModel):
+class Timeline1(BaseModel):
     index: int
     colorClass: str
     date: Optional[int] = None
