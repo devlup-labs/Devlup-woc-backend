@@ -11,6 +11,11 @@ app.add_middleware(
     allow_headers=["*"],
     
 )
+woc_status = {
+    1:"proposals",
+    2:"started",
+    3:"ended"
+}
 @app.get('/')
 def read_root():
     return {"Hello": "World"}
