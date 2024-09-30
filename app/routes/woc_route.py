@@ -1,21 +1,27 @@
-from fastapi import APIRouter,HTTPException,Query
-from fastapi import  Request
+import random
+from fastapi import APIRouter, Depends,HTTPException,Query
+from fastapi import  Request, Header
+from jsonschema import ValidationError
+from models.Timeline import Timeline
+from models.Project import Project
+from models.Idea import Idea
+from models.User import User
+from models.Mentor import Mentor
+from models.Proposal import Proposal
 from config.database import collection_projects
-from config.database import collection_timeline,collection_mentors,collection_ideas,collection_programs,collection_proposals
+from config.database import collection_timeline,collection_mentors,collection_ideas,collection_programs,collection_proposals,collection_progress
 from config.database import collection_users
-from schema.TimelineSchema import timeline_dict,timeline_list
-from schema.IdeaSchema import idea_dict,idea_list
-from schema.UserSchema import user_dict,user_list
-from schema.MentorSchema import mentor_dist,mentor_list
-from schema.ProjectSchema import dict_schema,list_schema
+from schema.ProgressSchema import progress_dict
 from schema.ProgramSchema import program_dist,program_list
-from schema.ProposalSchema import proposal_dist,proposal_list
 from starlette.requests import Request  
 from google.auth.transport import requests
 from fastapi.responses import JSONResponse
 from bson import ObjectId
 from dotenv import load_dotenv
-load_dotenv()  # take environment variables from .env.
+from typing import Annotated, Dict, List
+from routes.auth import create_access_token, get_current_user,get_current_user_role,role_required
+
+load_dotenv()  
 import os
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET =os.environ.get("GOOGLE_CLIENT_SECRET")
@@ -24,39 +30,57 @@ import requests
 route = APIRouter()
 
 #projects 
-@route.post('/project')
-async def get_projects(request:Request):
+@route.post('/project', dependencies=[Depends(role_required(["scrummaster"]))])
+async def add_project(request: Request):
     data = await request.json()
-    project = dict_schema(data)
-    collection_projects.insert_one(project)
-    return{"success":"true"}
+    project_id = ''.join(random.choices('0123456789', k=5))
+    data["id"] = project_id 
+    project = Project(**data)
+    collection_projects.insert_one(project.dict())
+    return {"success": True, "project_id": project_id}
 
 @route.get('/projects')
 async def get_projects():
-    projects = list_schema(collection_projects.find())
+    projects_data = list(collection_projects.find())
+    projects = [
+    Project(**project) for project in projects_data
+]
     return projects
 
 #timeline
-@route.get('/timeline')
+@route.get('/timeline', response_model=Dict[str, List[Timeline]])
 async def get_timeline():
-    timeline =collection_timeline.find({})
-    timelines=[]
-    for x in timeline:
-        timeline_data = timeline_dict(x)
-        timelines.append(timeline_data)
-    return{'status':'ok','data':timelines}
+    timelines = []
+    
+    for timeline in collection_timeline.find({}):
+        events = timeline.get("events", [])
+        timelines.append(
+            Timeline(
+                id=str(timeline["_id"]),
+                date=str(timeline["date"]),
+                events=events,
+                completed=timeline.get("completed", False)
+            )
+        )
+    
+    return {"timelines": timelines}
 
-@route.post('/timeline')
+@route.post('/timeline',dependencies=[Depends(role_required(["scrummaster"]))])
 async def post_timeline(request:Request):
-    data = await request.json()
-    timeline = timeline_dict(data)
-    collection_timeline.insert_one(timeline)
-    return{'status':'success'}
+    try:
+        data = await request.json()
+        data['id'] = str(random.randint(1000, 9999))
+        timeline = Timeline(**data)
+        collection_timeline.insert_one(timeline.dict())
+        return {'status': 'success'}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}
  
-@route.put('/updatetimeline/{id}/{done}')
+@route.put('/updatetimeline/{id}/{done}',dependencies=[Depends(role_required(["scrummaster"]))])
 async def update_timeline(id:str,done:bool):
  collection_timeline.update_one(
     {"_id": ObjectId(id)},
+
     {"$set": {"completed": done}}  
  )
  return{'status':'success'}
@@ -83,25 +107,50 @@ async def auth_google(request:Request):
     refresh_token = resp.get("refresh_token")
     if(access_token):
         user_info = requests.get("https://www.googleapis.com/oauth2/v1/userinfo", headers={"Authorization": f"Bearer {access_token}"})
-        return {"success":True, "user":user_info.json(),"token":access_token,"refresh":refresh_token}
-    else:      return {"success":False}
+        print(user_info.json())
+        email = user_info.json().get("email")
+        if email and email.endswith("@iitj.ac.in"):
+             token = create_access_token({"role":"1","id":user_info.json().get("id")})
+             return {"success":True, "user":user_info.json(),"token":access_token,"refresh":refresh_token,"jwt_token":token}
+        else:
+            return {
+                "success": False,
+                "message": "Email must end with @iitj.ac.in"
+            }
+    else:
+        return {
+            "success": False,
+            "message": "Failed to obtain access token"
+        }
+   
+# WOC Status
+woc_status = True
+@route.get("/woc_status")
+async def wocstatus(request:Request):
+      global woc_status
+      print(woc_status)
+      return woc_status
+   
+@route.put("/changestatus",dependencies=[Depends(role_required(["scrummaster"]))])
+async def change_status(request:Request):
+      global woc_status
+      woc_status=not woc_status
+      print(woc_status)
+      return woc_status
    
 #token verification
-@route.post("/token")
-async def get_user(request:Request):
-    data = await request.json()
-    token = data['access_token']
-    refresh_token = data['refresh_token']
-   
+@route.get("/token")
+async def get_user( 
+    access_token: Annotated[str | None, Header()] = None,
+    refresh_token: Annotated[str | None, Header()] = None): 
     data = {
         "client_id": {GOOGLE_CLIENT_ID},
         "client_secret": {GOOGLE_CLIENT_SECRET},
         "refresh_token": refresh_token,
         "grant_type": "refresh_token"
     }
-
     try:
-     user_info = requests.get("https://www.googleapis.com/oauth2/v1/userinfo", headers={"Authorization": f"Bearer {token}"})
+     user_info = requests.get("https://www.googleapis.com/oauth2/v1/userinfo", headers={"Authorization": f"Bearer {access_token}"})
      response = requests.post("https://oauth2.googleapis.com/token", data=data)
      response_data = response.json()
      if response.ok:
@@ -109,11 +158,18 @@ async def get_user(request:Request):
      else:
         return {"success":False}
      getuser=user_info.json()
+
      if getuser is None or 'id' not in getuser:
       user_info = requests.get("https://www.googleapis.com/oauth2/v1/userinfo", headers={"Authorization": f"Bearer {access_token}"})
       getuser = user_info.json()
      user=collection_users.find_one({'id':getuser["id"]})
-     return {"success":True, "image":getuser["picture"],'user':user,"access_token":access_token}
+     user =     User(**user)
+     user=user.dict()
+
+     jwt_token = create_access_token({"role":user['role'],"id":user['id']})
+     user_with_image = {**user, "image": getuser["picture"]}
+  
+     return {"success":True, 'user':user_with_image,"access_token":access_token,"jwt_token":jwt_token}
     
     except requests.exceptions.RequestException as e:
         return {"success": False, "error": str(e)}
@@ -121,7 +177,7 @@ async def get_user(request:Request):
 #edit_timeline
 @route.post("/")
 async def edit_timeline(request:Request):
-    data = await request.josn()
+    data = await request.json()
     status = data.status
     Id = data.id
     id = ObjectId(Id)
@@ -131,53 +187,72 @@ async def edit_timeline(request:Request):
 
 #user
 @route.post("/user")
-async def create_user(request:Request):
+async def create_user(request:Request,token_data: dict = Depends(get_current_user)):
+    if(token_data['id']==None):
+       raise HTTPException(
+            status_code=403,
+            detail="Unauthorized to delete proposal for this user",
+        )
     data = await request.json()
-    user = user_dict(data)
-    collection_users.insert_one(user)
-    return{"success":"true"}
+    user = User(**data)
+    collection_users.insert_one(user.dict())
+    token = create_access_token({"role":user.role,"id":user.id})
+    return{"success":"true","jwt_token":token}
 
 @route.post("/userinfo")
-async def get_user(request:Request):
+async def get_user(request:Request,token_data: dict = Depends(get_current_user)):
+    print(token_data)
+    if(token_data['id']==None):
+       raise HTTPException(
+            status_code=403,
+            detail="Unauthorized to delete proposal for this user",
+        )
     data = await request.json()
     id= data['id']
-    
     user =collection_users.find_one({'id':id})
     if(user):
-     user_format = user_dict(user)
-     return {"success":"true",'user':user_format}
+     user = User(**user)
+     user=user.dict()
+     token = create_access_token({"role":user["role"],"id":user["id"]})
+     return {"success":"true",'user':user,"token":token}
     else :
      return{"success":'false'}
 
 @route.put("/updateuser")
-async def update_user(request:Request):
+async def update_user(request:Request,token_data: dict = Depends(get_current_user)):
+   
    resp = await request.json()
    data= resp['updateduser']
+   if data["id"] != token_data["id"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Unauthorized to delete proposal for this user",
+        )
    user = collection_users.find_one({"id": data['id']})
    if user is None:
       return{"success":"false","error":"user is not found"}
    else :
-      update_user = user_dict(data)
+      update_user = User(**data)
       collection_users.update_one(
         {"_id": user["_id"]}, 
-        {"$set": update_user}  
+        {"$set": update_user.dict()}  
     )
-   return {"success":'true',"update_user":update_user}
+   return {"success":'true',"update_user":update_user.dict()}
 
 #mentor
-@route.post("/tobementor")
+@route.post("/tobementor",dependencies=[Depends(role_required(["1"]))])
 async def request_mentor(request:Request):
    resp = await request.json()
    user = collection_mentors.find_one({"id":resp["id"]})
    if(user):
       return{"success":False,'msg':"You have already sent your request."}
    else:
-    mentor = mentor_dist(resp)
-    collection_mentors.insert_one(mentor)
+    mentor = Mentor(**resp)
+    collection_mentors.insert_one(mentor.dict())
     return{"success":True,'msg':"Successfully sent request"}
 
-@route.post("/acceptmentor")
-async def acceptmentor(request:Request):
+@route.post("/acceptmentor",dependencies=[Depends(role_required(["scrummaster"]))])
+async def acceptmentor(request:Request,):
     resp = await request.json()
     user = collection_users.find_one({"id": resp['id']})
     user['role']='2'
@@ -187,30 +262,31 @@ async def acceptmentor(request:Request):
     collection_mentors.delete_one({"id":  resp["id"]})
     return{"success":"true"}
    
-@route.get("/getrequests")
+@route.get("/getrequests",dependencies=[Depends(role_required(["scrummaster"]))])
 async def getmentor_requests():
-    mentors = mentor_list(collection_mentors.find())
-    return mentors
+    mentors = collection_mentors.find()
+    return [Mentor(**mentor) for mentor in mentors]
 
 @route.get("/allmentors")
 async def getmentors():
    mentors = collection_users.find({'role':'2'})
-   mentors = user_list(mentors)
+   mentors = [User(**mentor) for mentor in mentors]
    return mentors
 #ideas
 @route.post("/idea")
 async def create_idea(request:Request):
    try:
     resp = await request.json()
-    idea = idea_dict(resp)
-    collection_ideas.insert_one(idea)
+    idea = Idea(**resp)
+    collection_ideas.insert_one(idea.dict())
     return {'success':'true'}
    except requests.exceptions.RequestException as e:
     return {"success": False, "error": str(e)}
-@route.get("/idea")
+@route.get("/idea",dependencies=[Depends(role_required(["scrummaster"]))])
 async def getallideas():
-    ideas = idea_list(collection_ideas.find())
-    return ideas
+    ideas = list(collection_ideas.find())
+    return [Idea(**idea) for idea in ideas]
+    
 
 #programs
 @route.post("/program")
@@ -230,20 +306,25 @@ async def getpastprograms():
 
 #addsprojects
 @route.post("/users/project")
-async def append_project_to_user(request: Request):
+async def append_project_to_user(request: Request,token_data: dict = Depends(get_current_user)):
     resp = await request.json()
     user_id = resp["user"]
     project_id = resp["_id"]
+    if user_id != token_data["id"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Unauthorized to delete proposal for this user",
+        ) 
     user = collection_users.find_one({"id": user_id})
     if user is None:
         raise HTTPException(status_code=404, detail="User not found", success=False)
         
-    user = user_dict(user)  # Assuming user_dict is defined elsewhere and returns a dict
-    
+    user = User(**user)  
+    user=user.dict()
     if len(user["projects"]) >= 2:
         return {"success": False, 'msg': "Already applied for two projects"}
     
-    project = collection_projects.find_one({"_id": ObjectId(project_id)})
+    project = collection_projects.find_one({"id": project_id})
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
     updated_user = collection_users.update_one(
@@ -251,15 +332,20 @@ async def append_project_to_user(request: Request):
         {"$addToSet": {"projects": project}}
     )
     user = collection_users.find_one({"id":user_id})
-    user = user_dict(user)
+    user = User(**user)
     proposal = resp["proposal"]
     collection_proposals.insert_one(proposal)
-    proposal=proposal_dist(proposal)
-    return {"msg": "Project appended to user successfully","proposal":proposal,"user":user}
+    proposal=Proposal(**proposal)
+    return {"msg": "Project appended to user successfully","proposal":proposal,"user":user.dict()}
 @route.get("/{user_id}/projects")
-async def user_projects(user_id:str):
+async def user_projects(user_id:str,token_data: dict = Depends(get_current_user)):
+   if user_id != token_data["id"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Unauthorized to delete proposal for this user",
+        )    
    user = collection_users.find_one({"id":user_id})  
-   projects = list_schema(user["projects"])
+   projects = [Project(**project) for project in user["projects"]]
    return projects
 
 #proposal
@@ -267,22 +353,47 @@ route.post("/addproposal")
 async def addproposal(request:Request):
    data = await request.json()
    proposal = collection_proposals.insert_one(data)
-   proposal = proposal_dist(proposal)
+   proposal = Proposal(**proposal)
    return{"success":"true","proposal":proposal}
 
 @route.delete("/deleteproposal")
-async def deleteproposal(user_id: str = Query(...), title: str = Query(...)):
+async def deleteproposal(user_id: str = Query(...), title: str = Query(...),token_data: dict = Depends(get_current_user)
+):
    user_id = (user_id)
+   if user_id != token_data["id"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Unauthorized to delete proposal for this user",
+        )
    collection_users.update_one(
         {'id':user_id},  
         {'$pull': {'projects': {'title':title}}}, 
     )
    user = collection_users.find_one({"id":user_id})
-   user = user_dict(user)
-   return{"success":"true","msg":"Deleted proposal","user":user}
+   user = User(**user)
+   return{"success":"true","msg":"Deleted proposal","user":user.dict()}
 
 @route.get("/proposals/{mentor}")
-async def getproposals(mentor:str): 
+async def getproposals(mentor:str,token_data: dict = Depends(get_current_user)):
+   mentorid = collection_users.find_one({
+        "$expr": {
+          "$eq": [{"$concat": ["$first_name", " ", "$last_name"]}, mentor]
+        }
+    })
+   if mentorid["id"] != token_data["id"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Unauthorized to delete proposal for this user",
+        )
    proposals = collection_proposals.find({"mentor":mentor})
-   proposals = proposal_list(proposals)
+   proposals = [Proposal(**proposal) for proposal in proposals]
    return proposals
+
+#progress
+@route.post("/addprogress")
+
+async def addprogress(request:Request):
+   data = await request.json()
+   progress = collection_progress.insert_one(data)
+   progress = progress_dict(progress)
+   return {"success":True}
