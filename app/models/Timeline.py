@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 
 class Timeline(BaseModel):
-    Date: str
+    id: str
+    date: str
     events: list[str]
     completed:bool = False
