@@ -1,9 +1,11 @@
 from pydantic import BaseModel
 
 class Project(BaseModel):
-    id: int
+    id: str
+    mentorid: str
     title: str
     tag:str
     technology: str
     description: str
     mentor:str
+
