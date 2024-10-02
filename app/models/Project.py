@@ -8,4 +8,5 @@ class Project(BaseModel):
     technology: str
     description: str
     mentor:str
+    mentee:list[str]=[]
 

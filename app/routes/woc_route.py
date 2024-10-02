@@ -28,6 +28,8 @@ GOOGLE_CLIENT_SECRET =os.environ.get("GOOGLE_CLIENT_SECRET")
 GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI")
 import requests
 route = APIRouter()
+woc_status = True
+results=False
 
 #projects 
 @route.post('/project', dependencies=[Depends(role_required(["scrummaster"]))])
@@ -39,6 +41,17 @@ async def add_project(request: Request):
     collection_projects.insert_one(project.dict())
     return {"success": True, "project_id": project_id}
 
+@route.post("/check-duplicate-username")
+async def check_duplicate_username(request: Request):
+    data = await request.json()
+    existing_user = collection_users.find_one({
+        "first_name": data["first_name"],
+        "last_name": data["last_name"]
+    })
+
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Already someone has the same username.")
+    return {"message": "Username is available."}
 @route.get('/projects')
 async def get_projects():
     projects_data = list(collection_projects.find())
@@ -124,7 +137,6 @@ async def auth_google(request:Request):
         }
    
 # WOC Status
-woc_status = True
 @route.get("/woc_status")
 async def wocstatus(request:Request):
       global woc_status
@@ -137,7 +149,19 @@ async def change_status(request:Request):
       woc_status=not woc_status
       print(woc_status)
       return woc_status
+#results
+@route.get("/results")
+async def wocstatus(request:Request):
+      global results
+      print(results)
+      return results
    
+@route.put("/changeresult",dependencies=[Depends(role_required(["scrummaster"]))])
+async def change_status(request:Request):
+      global results
+      results=not results
+      print(results)
+      return results
 #token verification
 @route.get("/token")
 async def get_user( 
@@ -188,11 +212,12 @@ async def edit_timeline(request:Request):
 #user
 @route.post("/user")
 async def create_user(request:Request,token_data: dict = Depends(get_current_user)):
-    if(token_data['id']==None):
-       raise HTTPException(
+    if token_data.get('id') is None:
+        raise HTTPException(
             status_code=403,
-            detail="Unauthorized to delete proposal for this user",
+            detail="Unauthorized to create user for this token",
         )
+
     data = await request.json()
     user = User(**data)
     collection_users.insert_one(user.dict())
@@ -311,6 +336,7 @@ async def append_project_to_user(request: Request,token_data: dict = Depends(get
     user_id = resp["user"]
     project_id = resp["_id"]
     if user_id != token_data["id"]:
+
         raise HTTPException(
             status_code=403,
             detail="Unauthorized to delete proposal for this user",
@@ -334,9 +360,11 @@ async def append_project_to_user(request: Request,token_data: dict = Depends(get
     user = collection_users.find_one({"id":user_id})
     user = User(**user)
     proposal = resp["proposal"]
-    collection_proposals.insert_one(proposal)
+    print(proposal)
+    proposal['id'] = str(random.randint(1000, 9999))
     proposal=Proposal(**proposal)
-    return {"msg": "Project appended to user successfully","proposal":proposal,"user":user.dict()}
+    collection_proposals.insert_one(proposal.dict())
+    return {"msg": "Project appended to user successfully","proposal":proposal.dict(),"user":user.dict()}
 @route.get("/{user_id}/projects")
 async def user_projects(user_id:str,token_data: dict = Depends(get_current_user)):
    if user_id != token_data["id"]:
@@ -372,6 +400,41 @@ async def deleteproposal(user_id: str = Query(...), title: str = Query(...),toke
    user = collection_users.find_one({"id":user_id})
    user = User(**user)
    return{"success":"true","msg":"Deleted proposal","user":user.dict()}
+@route.put('/updateproposal/{id}/{done}/{mentor}')
+async def update_proposal(id: str, done: bool, mentor: str, token_data: dict = Depends(get_current_user)):
+    mentorid = collection_users.find_one({
+        "$expr": {
+            "$eq": [{"$concat": ["$first_name", " ", "$last_name"]}, mentor]
+        }
+    })
+    if mentorid["id"] != token_data["id"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Unauthorized to update proposal for this user",
+        )
+    proposal = collection_proposals.find_one({"id": id})
+    if not proposal:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+    collection_proposals.update_one(
+        {"id": id},
+        {"$set": {"status": done}}
+    )
+    project = collection_projects.find_one({"title": proposal['title']})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if done:
+        if proposal['name'] not in project['mentee']:
+            project['mentee'].append(proposal['name'])
+    else:  
+        if proposal['name'] in project['mentee']:
+            project['mentee'].remove(proposal['name'])
+
+    collection_projects.update_one(
+        {"id": project['id']},
+        {"$set": {"mentee": project['mentee']}}
+    )
+
+    return {'status': 'success'}
 
 @route.get("/proposals/{mentor}")
 async def getproposals(mentor:str,token_data: dict = Depends(get_current_user)):
