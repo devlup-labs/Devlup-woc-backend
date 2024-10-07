@@ -8,5 +8,9 @@ class Project(BaseModel):
     technology: str
     description: str
     mentor:str
+    completed:bool=False
     mentee:list[str]=[]
+    codelink: str = ""
+    year:str
+    progress:str=""
 

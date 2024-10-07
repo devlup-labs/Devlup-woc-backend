@@ -5,5 +5,5 @@ class Proposal(BaseModel):
     name: str
     drive: str
     status:bool=False
-    mentor: str
+    mentorid: str
     email: str
