@@ -11,8 +11,6 @@ from models.Proposal import Proposal
 from config.database import collection_projects
 from config.database import collection_timeline,collection_mentors,collection_ideas,collection_programs,collection_proposals,collection_progress
 from config.database import collection_users
-from schema.ProgressSchema import progress_dict
-from schema.ProgramSchema import program_dist,program_list
 from starlette.requests import Request  
 from google.auth.transport import requests
 from fastapi.responses import JSONResponse
@@ -40,6 +38,39 @@ async def add_project(request: Request):
     project = Project(**data)
     collection_projects.insert_one(project.dict())
     return {"success": True, "project_id": project_id}
+@route.get("/mentor_projects/{mentorid}", response_model=List[Project])
+async def fetch_projects_by_mentor_id(mentorid: str):
+    projects = list(collection_projects.find({"mentorid": mentorid}))
+    if not projects:
+        raise HTTPException(status_code=404, detail="No projects found for this mentor ID")
+    return [Project(**project) for project in projects]
+@route.put('/update_project/',dependencies=[Depends(role_required(["scrummaster"]))])
+async def update_project(request:Request):
+    data=await request.json()
+    id = data['id']
+    link =data['link']
+    project = collection_projects.find_one({"id": id})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    result = collection_projects.update_one(
+        {"id": id},
+        {
+            "$set": 
+         {
+            "completed": True,
+            "codelink": link
+        }
+         }
+    )
+    projects_data = list(collection_projects.find({"completed": False}))
+    projects = [
+    Project(**project) for project in projects_data
+]
+    if result.modified_count == 0:
+        raise HTTPException(status_code=400, detail="Failed to update the project")
+    
+    return {"message": "Project updated successfully", "id": id,"projects":projects}
 
 @route.post("/check-duplicate-username")
 async def check_duplicate_username(request: Request):
@@ -54,7 +85,7 @@ async def check_duplicate_username(request: Request):
     return {"message": "Username is available."}
 @route.get('/projects')
 async def get_projects():
-    projects_data = list(collection_projects.find())
+    projects_data = list(collection_projects.find({"completed": False}))
     projects = [
     Project(**project) for project in projects_data
 ]
@@ -224,16 +255,14 @@ async def create_user(request:Request,token_data: dict = Depends(get_current_use
     token = create_access_token({"role":user.role,"id":user.id})
     return{"success":"true","jwt_token":token}
 
-@route.post("/userinfo")
-async def get_user(request:Request,token_data: dict = Depends(get_current_user)):
+@route.get("/userinfo/{id}")
+async def get_user(id:str,token_data: dict = Depends(get_current_user)):
     print(token_data)
     if(token_data['id']==None):
        raise HTTPException(
             status_code=403,
             detail="Unauthorized to delete proposal for this user",
         )
-    data = await request.json()
-    id= data['id']
     user =collection_users.find_one({'id':id})
     if(user):
      user = User(**user)
@@ -279,11 +308,11 @@ async def request_mentor(request:Request):
 @route.post("/acceptmentor",dependencies=[Depends(role_required(["scrummaster"]))])
 async def acceptmentor(request:Request,):
     resp = await request.json()
-    user = collection_users.find_one({"id": resp['id']})
-    user['role']='2'
     collection_users.update_one(
-        {"_id": user["_id"]}, 
-        {"$set": user}  )
+        {"id": resp['id']}, 
+        {"$set": {
+            "role": "2",
+        }}  )
     collection_mentors.delete_one({"id":  resp["id"]})
     return{"success":"true"}
    
@@ -313,21 +342,15 @@ async def getallideas():
     return [Idea(**idea) for idea in ideas]
     
 
-#programs
-@route.post("/program")
-async def add_program(request:Request):
-   try:
-    resp = await request.json()
-    program = program_dist(resp)
-    collection_programs.insert_one(program)
-    return {'success':'true'}
-   except requests.exceptions.RequestException as e:
-    return {"success": False, "error": str(e)}
 
 @route.get("/pastprograms")
 async def getpastprograms():
-    programs = program_list(collection_programs.find())
-    return programs
+    programs = list(collection_projects.find({"completed": True}))
+    pastprojects = [
+    Project(**project) for project in programs
+]
+    return pastprojects
+
 
 #addsprojects
 @route.post("/users/project")
@@ -385,7 +408,7 @@ async def addproposal(request:Request):
    return{"success":"true","proposal":proposal}
 
 @route.delete("/deleteproposal")
-async def deleteproposal(user_id: str = Query(...), title: str = Query(...),token_data: dict = Depends(get_current_user)
+async def deleteproposal(user_id: str = Query(...), title: str = Query(...),id:str = Query(...),token_data: dict = Depends(get_current_user)
 ):
    user_id = (user_id)
    if user_id != token_data["id"]:
@@ -399,15 +422,14 @@ async def deleteproposal(user_id: str = Query(...), title: str = Query(...),toke
     )
    user = collection_users.find_one({"id":user_id})
    user = User(**user)
+   result = collection_proposals.delete_one({"id": id})
+   if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Proposal not found")
    return{"success":"true","msg":"Deleted proposal","user":user.dict()}
-@route.put('/updateproposal/{id}/{done}/{mentor}')
-async def update_proposal(id: str, done: bool, mentor: str, token_data: dict = Depends(get_current_user)):
-    mentorid = collection_users.find_one({
-        "$expr": {
-            "$eq": [{"$concat": ["$first_name", " ", "$last_name"]}, mentor]
-        }
-    })
-    if mentorid["id"] != token_data["id"]:
+
+@route.put('/updateproposal/{id}/{done}/{mentorid}')
+async def update_proposal(id: str, done: bool, mentorid: str, token_data: dict = Depends(get_current_user)):
+    if mentorid != token_data["id"]:
         raise HTTPException(
             status_code=403,
             detail="Unauthorized to update proposal for this user",
@@ -436,27 +458,30 @@ async def update_proposal(id: str, done: bool, mentor: str, token_data: dict = D
 
     return {'status': 'success'}
 
-@route.get("/proposals/{mentor}")
-async def getproposals(mentor:str,token_data: dict = Depends(get_current_user)):
-   mentorid = collection_users.find_one({
-        "$expr": {
-          "$eq": [{"$concat": ["$first_name", " ", "$last_name"]}, mentor]
-        }
-    })
-   if mentorid["id"] != token_data["id"]:
+@route.get("/proposals/{mentorid}")
+async def getproposals(mentorid:str,token_data: dict = Depends(get_current_user)):
+   if mentorid!= token_data["id"]:
         raise HTTPException(
             status_code=403,
             detail="Unauthorized to delete proposal for this user",
         )
-   proposals = collection_proposals.find({"mentor":mentor})
+   proposals = collection_proposals.find({"mentorid":mentorid})
    proposals = [Proposal(**proposal) for proposal in proposals]
    return proposals
 
 #progress
-@route.post("/addprogress")
+@route.post("/addprogress",dependencies=[Depends(role_required(["2"]))])
+async def update_project_progress(request:Request):
+    try:
+        data= await request.json()
+        result = collection_projects.update_one(
+            {"id": data["id"]},
+            {"$set": {"progress": data["progress"]}}
+        )
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Project not found")
 
-async def addprogress(request:Request):
-   data = await request.json()
-   progress = collection_progress.insert_one(data)
-   progress = progress_dict(progress)
-   return {"success":True}
+        return {"message": "Progress updated successfully"}
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

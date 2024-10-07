@@ -3,7 +3,8 @@ from typing import List
 from dotenv import load_dotenv
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
-from grpc import Status
+from fastapi import status
+
 from jose import JWTError
 import jwt
 ALGORITHM = "HS256"
@@ -25,14 +26,14 @@ def get_current_user_role(token: str = Depends(oauth2_scheme)):
         user_role = payload.get("role")
         if user_role is None:
             raise HTTPException(
-                status_code=Status.HTTP_401_UNAUTHORIZED,
+                status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Role not found in token",
                 headers={"WWW-Authenticate": "Bearer"},
             )
         return user_role
     except JWTError:
         raise HTTPException(
-            status_code=Status.HTTP_401_UNAUTHORIZED,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",
             headers={"WWW-Authenticate": "Bearer"},
         )
@@ -42,7 +43,7 @@ def role_required(required_roles: List[str]):
         
         if user_role not in required_roles:
             raise HTTPException(
-                status_code=Status.HTTP_403_FORBIDDEN,
+                status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Insufficient permissions. Required roles: {required_roles}",
             )
         return user_role
