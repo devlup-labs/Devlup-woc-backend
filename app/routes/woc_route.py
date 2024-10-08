@@ -182,7 +182,7 @@ async def change_status(request:Request):
       return woc_status
 #results
 @route.get("/results")
-async def wocstatus(request:Request):
+async def resultstatus(request:Request):
       global results
       print(results)
       return results
@@ -257,11 +257,10 @@ async def create_user(request:Request,token_data: dict = Depends(get_current_use
 
 @route.get("/userinfo/{id}")
 async def get_user(id:str,token_data: dict = Depends(get_current_user)):
-    print(token_data)
     if(token_data['id']==None):
        raise HTTPException(
             status_code=403,
-            detail="Unauthorized to delete proposal for this user",
+            detail="Unauthorized user",
         )
     user =collection_users.find_one({'id':id})
     if(user):
@@ -328,8 +327,13 @@ async def getmentors():
    return mentors
 #ideas
 @route.post("/idea")
-async def create_idea(request:Request):
+async def create_idea(request:Request,token_data: dict = Depends(get_current_user)):
    try:
+    if(token_data['id']==None):
+       raise HTTPException(
+            status_code=403,
+            detail="Unauthorized user",
+        )
     resp = await request.json()
     idea = Idea(**resp)
     collection_ideas.insert_one(idea.dict())
