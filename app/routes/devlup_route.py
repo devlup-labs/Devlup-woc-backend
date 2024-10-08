@@ -6,7 +6,3 @@ route = APIRouter()
 
 
 
-@route.post('/project')
-async def create_project(project: Project):
-    collection_projects.insert_one(project.dict())
-    return project
